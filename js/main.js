@@ -380,6 +380,34 @@
     var SUPABASE_URL = window.SUPABASE_URL || 'https://your-project.supabase.co';
     var SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'your-anon-key';
     var supabaseClient = null;
+    var supabaseConfigPromise = null;
+
+    function hasValidSupabaseConfig() {
+        return SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.indexOf('your-project') === -1 && SUPABASE_ANON_KEY !== 'your-anon-key';
+    }
+
+    function fetchSupabaseConfigFromApi() {
+        if (supabaseConfigPromise) {
+            return supabaseConfigPromise;
+        }
+        supabaseConfigPromise = fetch('/api/env', { cache: 'no-store' })
+            .then(function (res) { return res.ok ? res.json() : {}; })
+            .catch(function () { return {}; });
+        return supabaseConfigPromise;
+    }
+
+    async function ensureSupabaseConfig() {
+        if (hasValidSupabaseConfig()) {
+            return;
+        }
+        var cfg = await fetchSupabaseConfigFromApi();
+        if (cfg.supabaseUrl) {
+            SUPABASE_URL = cfg.supabaseUrl;
+        }
+        if (cfg.supabaseAnonKey) {
+            SUPABASE_ANON_KEY = cfg.supabaseAnonKey;
+        }
+    }
 
     function renderWishList(wishes) {
         var container = $('#comments-container');
@@ -438,8 +466,9 @@
         loadWishes();
     }
 
-    function initSupabaseGuestbook() {
-        if (!window.supabase || !SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL.indexOf('your-project') !== -1 || SUPABASE_ANON_KEY === 'your-anon-key') {
+    async function initSupabaseGuestbook() {
+        await ensureSupabaseConfig();
+        if (!window.supabase || !hasValidSupabaseConfig()) {
             $('#comments-container').html('<p class=\"text-warning\">Supabase belum dikonfigurasi. Isi SUPABASE_URL dan SUPABASE_ANON_KEY.</p>');
             return;
         }
